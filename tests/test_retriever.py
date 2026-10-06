@@ -2,7 +2,7 @@
 
 import pytest
 
-from rag.retriever import retrieve_chunks, store_chunks
+from rag.retriever import create_collection, retrieve_chunks, store_chunks
 
 
 class FakeEmbeddingModel:
@@ -77,3 +77,21 @@ def test_distant_results_are_filtered():
     }
 
     assert retrieve_chunks(collection, "question", FakeEmbeddingModel()) == []
+
+
+def test_real_chromadb_persists_and_searches_chunks(tmp_path):
+    # This checks the real local ChromaDB API while using a tiny deterministic
+    # embedding double, so it does not download or load a machine learning model.
+    _client, collection = create_collection(tmp_path / "chroma")
+    model = FakeEmbeddingModel()
+    store_chunks(
+        collection,
+        [{"text": "Attendance details", "metadata": {"file_name": "rules.pdf", "page_number": 3}}],
+        model,
+    )
+
+    matches = retrieve_chunks(collection, "attendance", model)
+
+    assert len(matches) == 1
+    assert matches[0]["text"] == "Attendance details"
+    assert matches[0]["metadata"]["file_name"] == "rules.pdf"
