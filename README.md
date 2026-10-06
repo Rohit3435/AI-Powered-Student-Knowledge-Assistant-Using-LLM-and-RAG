@@ -21,7 +21,7 @@ Top matching passages and citations (rag/pipeline.py)
         ↓
 Ollama llama3.2 answer (llm/ollama.py)
         ↓
-Terminal output (main.py)
+Streamlit page (app.py) or terminal (main.py)
 ```
 
 ## Folder Structure
@@ -31,12 +31,14 @@ data/documents/       Add supported source files here
 rag/                  Loading, chunking, embeddings, search, and pipeline
 llm/                  Local Ollama integration
 tests/                Tests that do not require a running Ollama service
+knowledge_base/       Shared, public NSUT knowledge chunks
+app.py                Basic Streamlit question interface
 main.py               Terminal question interface
 requirements.txt      Current Python dependencies
 AGENTS.md             Project-specific development guidance
 ```
 
-The local ChromaDB files are created in `chroma_db/` and ignored by Git. Files placed in `data/documents/` are also ignored so private documents are not uploaded accidentally.
+The local ChromaDB files are created in `chroma_db/` and ignored by Git. Files placed in `data/documents/` are also ignored so private documents are not uploaded accidentally. The curated shared NSUT chunks live in `knowledge_base/` and are used by both login types.
 
 ## Technologies Used
 
@@ -72,21 +74,32 @@ ollama pull llama3.2
 
 The program connects to `http://localhost:11434`. This local setup does not require an API key. If the service is stopped or the model is missing, the program prints a helpful message.
 
-## How to Run
+## How to Run the Streamlit Page
 
 1. Put supported files in `data/documents/`: PDF, CSV, `.xlsx`, `.xlsm`, `.xls`, JSON, TXT, or Markdown.
 2. Start Ollama and make sure `llama3.2` is available.
 3. In the project folder, run:
 
 ```powershell
-python main.py
+python -m streamlit run app.py
 ```
 
-The app reads supported files and rebuilds the local index once when it starts. Ask multiple questions in the same session; type `exit` when you are done. Keeping the session open avoids loading the embedding model again between questions.
+The page offers two options:
+
+- **Student login** checks the email and password against `data/documents/id_pass/MindMesh_30_Synthetic_Student_Login_Data.csv`. Student email addresses must end with `@nsut.ac.in`. The CSV needs `nsut_email` and `test_password` columns.
+- **General user** can ask about the shared NSUT rules and notices, plus supported local files whose filenames do not contain `student`, `placement`, or `eligibility` (case-insensitive). General users do not search local student-record files. Student users can search all supported local files and the shared NSUT knowledge base.
+
+Each role uses its own local ChromaDB index. **Sign out / change user** returns to the two options. Keep the credential CSV private; it is ignored by Git along with the other files under `data/documents/`.
+
+The terminal interface is still available with `python main.py`.
+
+## Shared NSUT Knowledge Base
+
+The file `knowledge_base/NSUT_Student_Knowledge_Base_Chunks.jsonl` comes from the [NSUT Knowledge Base handoff on the `aditya` branch](https://github.com/Rohit3435/AI_HCL_TECH_MIND_MESHERS/tree/aditya/NSUT_Knowledge_Base_Handoff). The handoff provides JSONL chunks rather than the original PDFs. This project includes only chunks whose source document title contains `student`: four chunks from two regulations/notices. Both login types can search this file. Citations use the source document title, page, and section stored in the chunk metadata. The upstream metadata does not include a usable source URL for every chunk.
 
 ## How RAG Works
 
-RAG means retrieval augmented generation. The loader extracts PDF pages separately, CSV rows, spreadsheet rows, JSON items, or text content. It keeps filenames and real source locations: PDF page, CSV row, Excel sheet and row, or JSON array path. The chunker splits extracted text into groups of 500 words with 80 words repeated between adjacent groups. This keeps passages small enough to search while helping preserve meaning across chunk boundaries.
+RAG means retrieval augmented generation. The loader extracts PDF pages separately, CSV rows, spreadsheet rows, JSON items/JSONL records, or text content. It keeps filenames and real source locations: PDF page, CSV row, Excel sheet and row, JSON array path, or the shared knowledge base document title, page, and section. The chunker splits extracted text into groups of 500 words with 80 words repeated between adjacent groups. This keeps passages small enough to search while helping preserve meaning across chunk boundaries.
 
 The embedding model turns every chunk and question into a list of numbers representing its meaning. ChromaDB stores those vectors with the original text and metadata. A question retrieves up to three nearby chunks; results that are too far away are ignored. If no relevant context is found, Ollama is not called.
 
@@ -98,7 +111,7 @@ The retrieved passages and question are sent to the local `llama3.2` model. The 
 
 ## How Citations Work
 
-Sources come from metadata attached while each file is loaded. The terminal prints the filename and available page, sheet, row, or JSON path for each retrieved source. It only displays locations the loader actually has; it does not guess page or row numbers.
+Sources come from metadata attached while each file is loaded. The Streamlit page and terminal show the filename and available page, sheet, row, or JSON path for each retrieved source. Shared NSUT chunks cite their document title, page, and section. The interface only displays locations the loader actually has; it does not guess page or row numbers.
 
 ## Example Question
 
@@ -122,13 +135,9 @@ The tests cover document loading behavior, empty folders, invalid PDFs, chunking
 
 ## Current Limitations
 
-- Supported formats are PDF, CSV, Excel (`.xlsx`, `.xlsm`, `.xls`), JSON, TXT, and Markdown.
+- Supported formats are PDF, CSV, Excel (`.xlsx`, `.xlsm`, `.xls`), JSON/JSONL, TXT, and Markdown.
 - Scanned PDFs need OCR, which is not included.
-- The app processes questions one at a time in the terminal.
+- The app processes one question at a time.
 - The embedding model must be downloaded once before first use.
 - Answer quality depends on the documents, retrieval results, and local model.
 - The local database is rebuilt from all supported files when the app starts.
-
-## Future Integration
-
-Streamlit, FastAPI, SQLite, LangGraph, authentication, deployment, and other application components will be integrated later. They are outside the scope of this local RAG and Ollama stage.

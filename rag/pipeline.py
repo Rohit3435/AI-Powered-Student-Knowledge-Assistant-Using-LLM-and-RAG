@@ -18,17 +18,35 @@ from rag.retriever import create_collection, retrieve_chunks, store_chunks
 def prepare_pipeline(
     documents_folder: str | Path = "data/documents",
     database_path: str | Path = "chroma_db",
+    excluded_file_name_keywords: tuple[str, ...] = (),
+    allow_empty: bool = False,
+    shared_documents_folder: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Read supported documents, create chunks and embeddings, and index them."""
+    """Read supported documents, optionally filter filenames, then index them."""
     documents = load_documents(documents_folder)
-    if not documents:
+    excluded_keywords = tuple(keyword.casefold() for keyword in excluded_file_name_keywords)
+    if excluded_keywords:
+        documents = [
+            document for document in documents
+            if not any(
+                keyword in document["metadata"]["file_name"].casefold()
+                for keyword in excluded_keywords
+            )
+        ]
+    if shared_documents_folder is not None:
+        # Shared sources are appended after role-specific filtering so the
+        # approved NSUT knowledge file remains available to both user types.
+        documents.extend(load_documents(shared_documents_folder))
+    if not documents and not allow_empty:
         raise FileNotFoundError(
             f"No readable documents were found in '{documents_folder}'. "
-            "Add a supported PDF, CSV, Excel, JSON, TXT, or Markdown file and run again."
+            "Add a supported PDF, CSV, Excel, JSON/JSONL, TXT, or Markdown file and run again."
         )
 
     chunks = split_documents(documents)
-    embedding_model = load_embedding_model()
+    # An empty role-specific index is valid when a user is allowed to ask only
+    # about a narrower set of documents than the folder currently contains.
+    embedding_model = load_embedding_model() if chunks else None
     client, collection = create_collection(database_path)
     store_chunks(collection, chunks, embedding_model)
     return {
@@ -81,7 +99,8 @@ def answer_question(
         # Only include source locations the loader actually knows. For example,
         # PDFs have page numbers, while spreadsheets have sheet and row names.
         source = {key: metadata[key] for key in (
-            "file_name", "page_number", "sheet_name", "row_number", "json_path"
+            "file_name", "document_title", "doc_id", "page_number", "page_label",
+            "section", "clause", "category", "source_url", "sheet_name", "row_number", "json_path"
         ) if key in metadata}
         source_key = tuple(sorted(source.items()))
         if source_key not in seen:

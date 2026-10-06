@@ -156,6 +156,38 @@ def _load_json(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read one JSON record per line and retain its NSUT source citations."""
+    records = []
+    with path.open("r", encoding="utf-8-sig") as jsonl_file:
+        for line in jsonl_file:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            source = item.get("metadata", {})
+            title = source.get("document_title") or source.get("doc_id") or path.name
+            source_page = str(source.get("page", "")).strip()
+            location: dict[str, Any] = {
+                "document_title": title,
+                "doc_id": source.get("doc_id", ""),
+                "section": source.get("section", ""),
+                "clause": source.get("clause", ""),
+                "category": source.get("category", ""),
+            }
+            if source_page.isdigit():
+                location["page_number"] = int(source_page)
+            elif source_page:
+                location["page_label"] = source_page
+            source_url = source.get("source_url", "")
+            if source_url and source_url.casefold() != "unknown":
+                location["source_url"] = source_url
+
+            record = _make_record(title, item.get("text", ""), **location)
+            if record:
+                records.append(record)
+    return records
+
+
 def _load_text(path: Path) -> list[dict[str, Any]]:
     """Read plain text or Markdown files; the filename is their source."""
     record = _make_record(path.name, path.read_text(encoding="utf-8-sig"))
@@ -169,7 +201,7 @@ def _load_text(path: Path) -> list[dict[str, Any]]:
 def load_documents(folder_path: str | Path) -> list[dict[str, Any]]:
     """Read supported files from a folder and retain truthful source metadata.
 
-    Supported formats are PDF, CSV, .xlsx/.xlsm, .xls, JSON, TXT, and Markdown.
+    Supported formats are PDF, CSV, .xlsx/.xlsm, .xls, JSON/JSONL, TXT, and Markdown.
     Damaged supported files are reported and skipped without stopping the
     other files. Files with unsupported extensions are ignored.
     """
@@ -184,6 +216,7 @@ def load_documents(folder_path: str | Path) -> list[dict[str, Any]]:
         ".xlsm": _load_xlsx,
         ".xls": _load_xls,
         ".json": _load_json,
+        ".jsonl": _load_jsonl,
         ".txt": _load_text,
         ".md": _load_text,
     }
