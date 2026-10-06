@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project can answer general questions with local Ollama, or answer questions from local PDF documents using retrieval augmented generation (RAG). RAG searches for relevant passages with embeddings and ChromaDB before asking Ollama to write a grounded answer. No university policy documents are included; add approved, real documents to `data/documents/` to use PDF search.
+This project answers student questions from local PDF documents using retrieval augmented generation (RAG). It searches for relevant passages with embeddings and ChromaDB, then asks a local Ollama model to write a grounded answer. No university policy documents are included; add approved, real documents to `data/documents/`.
 
 ## Current Architecture
 
@@ -79,7 +79,7 @@ The program connects to `http://localhost:11434`. This local setup does not requ
 python main.py
 ```
 
-Choose general question mode to ask Ollama without PDFs, or PDF question mode to search your documents. In PDF mode, the app reads the PDFs and rebuilds the local index so removed or changed files do not leave stale search results.
+Type one question when prompted. The app reads the PDFs and rebuilds the local index so removed or changed files do not leave stale search results.
 
 ## How RAG Works
 
@@ -89,11 +89,11 @@ The embedding model turns every chunk and question into a list of numbers repres
 
 ## How Ollama Works
 
-For general questions, the prompt asks local `llama3.2` to answer from general knowledge and say when it is uncertain. For PDF questions, retrieved passages and the question are sent to the model with instructions to answer from the supplied context, avoid unsupported claims, say when information was not found, and treat document text as data rather than instructions. Ollama generates answers on the local machine.
+The retrieved passages and question are sent to the local `llama3.2` model. The prompt instructs it to answer from the supplied context, avoid unsupported claims, say when information was not found, and treat document text as data rather than instructions. Ollama generates the answer on the local machine.
 
 ## How Citations Work
 
-PDF grounded answers include sources from metadata attached when each PDF page is loaded. The terminal prints the original filename and page number for each retrieved source. If page metadata is unavailable, it prints only the filename. General answers do not use PDF sources. No source or page number is guessed.
+Sources come from metadata attached when each PDF page is loaded. The terminal prints the original filename and page number for each retrieved source. If page metadata is unavailable, it prints only the filename. No source or page number is guessed.
 
 ## Example Question
 
