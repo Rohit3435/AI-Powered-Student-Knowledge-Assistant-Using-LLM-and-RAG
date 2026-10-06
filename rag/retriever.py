@@ -55,7 +55,7 @@ def retrieve_chunks(
     question: str,
     embedding_model: Any,
     top_k: int = 3,
-    max_distance: float = 0.65,
+    max_distance: float = 0.75,
 ) -> list[dict[str, Any]]:
     """Return nearby chunks, including only results under a distance limit.
 

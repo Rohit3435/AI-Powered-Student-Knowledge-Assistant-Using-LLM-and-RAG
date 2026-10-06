@@ -20,6 +20,10 @@ def main() -> None:
         print("Check that the required packages are installed and try again.")
         return
 
+    loaded_files = sorted({
+        document["metadata"]["file_name"] for document in pipeline["documents"]
+    })
+    print(f"Loaded {len(loaded_files)} document file(s): {', '.join(loaded_files)}")
     print("Ask questions about the loaded documents. Type 'exit' to quit.")
     while True:
         try:
@@ -37,6 +41,7 @@ def main() -> None:
                 question,
                 pipeline["collection"],
                 pipeline["embedding_model"],
+                documents=pipeline["documents"],
             )
         except ValueError as error:
             print(error)

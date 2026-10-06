@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from llm.ollama import ask_ollama
 from rag.chunking import split_documents
+from rag.eligibility import answer_eligibility_question
 from rag.embeddings import load_embedding_model
 from rag.loader import load_documents
 from rag.retriever import create_collection, retrieve_chunks, store_chunks
@@ -18,7 +19,7 @@ def prepare_pipeline(
     documents_folder: str | Path = "data/documents",
     database_path: str | Path = "chroma_db",
 ) -> dict[str, Any]:
-    """Read PDFs, create chunks and embeddings, and store them in ChromaDB."""
+    """Read supported documents, create chunks and embeddings, and index them."""
     documents = load_documents(documents_folder)
     if not documents:
         raise FileNotFoundError(
@@ -30,7 +31,12 @@ def prepare_pipeline(
     embedding_model = load_embedding_model()
     client, collection = create_collection(database_path)
     store_chunks(collection, chunks, embedding_model)
-    return {"client": client, "collection": collection, "embedding_model": embedding_model}
+    return {
+        "client": client,
+        "collection": collection,
+        "embedding_model": embedding_model,
+        "documents": documents,
+    }
 
 
 # ==========================================
@@ -42,10 +48,19 @@ def answer_question(
     collection: Any,
     embedding_model: Any,
     answer_function: Callable[[str, str], str] = ask_ollama,
+    documents: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Retrieve matching passages, ask Ollama, and return answer plus sources."""
     if not question.strip():
         raise ValueError("Please enter a question.")
+
+    # Some questions, such as placement eligibility, need exact comparisons
+    # across a student table and a policy document. Check their actual values
+    # directly instead of asking semantic search or the LLM to do arithmetic.
+    if documents:
+        eligibility_result = answer_eligibility_question(question, documents)
+        if eligibility_result is not None:
+            return eligibility_result
 
     matches = retrieve_chunks(collection, question, embedding_model)
     if not matches:

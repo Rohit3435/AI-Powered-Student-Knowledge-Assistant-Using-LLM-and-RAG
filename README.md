@@ -90,6 +90,8 @@ RAG means retrieval augmented generation. The loader extracts PDF pages separate
 
 The embedding model turns every chunk and question into a list of numbers representing its meaning. ChromaDB stores those vectors with the original text and metadata. A question retrieves up to three nearby chunks; results that are too far away are ignored. If no relevant context is found, Ollama is not called.
 
+For placement eligibility questions, the app reads the student values from the uploaded table and the company thresholds from the uploaded policy. It compares CGPA, attendance, backlogs, and branch directly before generating an answer, so those numeric checks do not depend on the language model guessing.
+
 ## How Ollama Works
 
 The retrieved passages and question are sent to the local `llama3.2` model. The prompt instructs it to answer from the supplied context, avoid unsupported claims, say when information was not found, and treat document text as data rather than instructions. Ollama generates the answer on the local machine.

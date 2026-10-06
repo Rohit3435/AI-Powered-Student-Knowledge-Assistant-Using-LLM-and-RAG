@@ -87,6 +87,42 @@ def test_answer_sources_keep_non_pdf_locations():
     ]
 
 
+def test_eligibility_uses_uploaded_student_row_and_policy_rules():
+    documents = [
+        {
+            "text": (
+                "Company\nMinimum CGPA\nMinimum Attendance\nMaximum Backlogs\nEligible Branches\n"
+                "FinSecure Technologies\n8.0\n70%\n0\nCSE, ECE\n"
+            ),
+            "metadata": {"file_name": "eligibility.pdf", "page_number": 1},
+        },
+        {
+            "text": (
+                "student_id: STU001. name: Aarav Sharma. branch: ECE. semester: 6. "
+                "attendance_percent: 82.5. cgpa: 7.8. backlogs: 0. attendance_status: Eligible"
+            ),
+            "metadata": {"file_name": "students.csv", "row_number": 2},
+        },
+    ]
+
+    result = answer_question(
+        "Is Aarav Sharma eligible for infosec technologies?",
+        FakeCollection([]),
+        FakeEmbeddingModel(),
+        lambda *_args: pytest.fail("Verified eligibility should not use LLM arithmetic"),
+        documents=documents,
+    )
+
+    assert result["answer"] == (
+        "No. Aarav Sharma is not eligible for FinSecure Technologies: "
+        "CGPA 7.8 is below the required 8."
+    )
+    assert result["sources"] == [
+        {"file_name": "students.csv", "row_number": 2},
+        {"file_name": "eligibility.pdf", "page_number": 1},
+    ]
+
+
 def test_prepare_pipeline_reports_empty_document_folder(tmp_path):
     with pytest.raises(FileNotFoundError, match="No readable documents"):
         prepare_pipeline(tmp_path, tmp_path / "chroma")
@@ -106,7 +142,15 @@ def test_prepare_pipeline_loads_and_indexes_documents(tmp_path, monkeypatch):
 
     result = prepare_pipeline(tmp_path, tmp_path / "chroma")
 
-    assert result == {"client": "client", "collection": fake_collection, "embedding_model": fake_model}
+    assert result == {
+        "client": "client",
+        "collection": fake_collection,
+        "embedding_model": fake_model,
+        "documents": [{
+            "text": "Some policy text",
+            "metadata": {"file_name": "policy.pdf", "page_number": 1},
+        }],
+    }
     assert calls[0][0] is fake_collection
     assert calls[0][2] is fake_model
     assert calls[0][1][0]["metadata"]["file_name"] == "policy.pdf"
