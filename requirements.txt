@@ -2,4 +2,6 @@ chromadb
 ollama
 sentence-transformers
 pypdf
+openpyxl
+xlrd
 pytest

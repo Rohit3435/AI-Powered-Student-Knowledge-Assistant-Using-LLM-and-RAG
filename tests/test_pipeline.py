@@ -64,8 +64,31 @@ def test_empty_question_is_rejected_before_retrieval():
         answer_question(" ", FakeCollection([]), FakeEmbeddingModel())
 
 
+def test_answer_sources_keep_non_pdf_locations():
+    collection = FakeCollection(
+        [
+            {
+                "text": "The lab is in room B-12.",
+                "metadata": {
+                    "file_name": "schedule.xlsx",
+                    "sheet_name": "Labs",
+                    "row_number": 8,
+                },
+            }
+        ]
+    )
+
+    result = answer_question(
+        "Where is the lab?", collection, FakeEmbeddingModel(), lambda *_args: "Room B-12."
+    )
+
+    assert result["sources"] == [
+        {"file_name": "schedule.xlsx", "sheet_name": "Labs", "row_number": 8}
+    ]
+
+
 def test_prepare_pipeline_reports_empty_document_folder(tmp_path):
-    with pytest.raises(FileNotFoundError, match="No readable PDF"):
+    with pytest.raises(FileNotFoundError, match="No readable documents"):
         prepare_pipeline(tmp_path, tmp_path / "chroma")
 
 

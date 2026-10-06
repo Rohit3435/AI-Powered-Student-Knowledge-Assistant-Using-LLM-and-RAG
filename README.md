@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-This project answers student questions from local PDF documents using retrieval augmented generation (RAG). It searches for relevant passages with embeddings and ChromaDB, then asks a local Ollama model to write a grounded answer. No university policy documents are included; add approved, real documents to `data/documents/`.
+This project answers student questions from documentation in local PDF, CSV, Excel, JSON, TXT, and Markdown files. It searches for relevant passages with embeddings and ChromaDB, then asks a local Ollama model to write a grounded answer. No university policy documents are included; add approved, real documents to `data/documents/`.
 
 ## Current Architecture
 
 ```text
-PDF files in data/documents/
+PDF, CSV, Excel, JSON, TXT, or Markdown files in data/documents/
         ↓
-PDF page text and source metadata (rag/loader.py)
+Extracted text and source metadata (rag/loader.py)
         ↓
 Word based chunks with overlap (rag/chunking.py)
         ↓
@@ -27,7 +27,7 @@ Terminal output (main.py)
 ## Folder Structure
 
 ```text
-data/documents/       Add local PDF documents here
+data/documents/       Add supported source files here
 rag/                  Loading, chunking, embeddings, search, and pipeline
 llm/                  Local Ollama integration
 tests/                Tests that do not require a running Ollama service
@@ -45,6 +45,9 @@ The local ChromaDB files are created in `chroma_db/` and ignored by Git. Files p
 - ChromaDB for local vector storage and search
 - `sentence-transformers` with `all-MiniLM-L6-v2` for embeddings
 - `pypdf` for PDF text extraction
+- Python CSV and JSON readers
+- `openpyxl` for `.xlsx` and `.xlsm` spreadsheets
+- `xlrd` for older `.xls` spreadsheets
 - `pytest` for tests
 
 ## Installation
@@ -71,7 +74,7 @@ The program connects to `http://localhost:11434`. This local setup does not requ
 
 ## How to Run
 
-1. Put text-based PDF files in `data/documents/`.
+1. Put supported files in `data/documents/`: PDF, CSV, `.xlsx`, `.xlsm`, `.xls`, JSON, TXT, or Markdown.
 2. Start Ollama and make sure `llama3.2` is available.
 3. In the project folder, run:
 
@@ -79,11 +82,11 @@ The program connects to `http://localhost:11434`. This local setup does not requ
 python main.py
 ```
 
-Type one question when prompted. The app reads the PDFs and rebuilds the local index so removed or changed files do not leave stale search results.
+Type one question when prompted. The app reads supported files and rebuilds the local index so removed or changed files do not leave stale search results.
 
 ## How RAG Works
 
-RAG means retrieval augmented generation. The loader extracts each PDF page separately and keeps its filename and actual one-based page number. The chunker splits each page into groups of 500 words with 80 words repeated between adjacent groups. This keeps passages small enough to search while helping preserve meaning across chunk boundaries.
+RAG means retrieval augmented generation. The loader extracts PDF pages separately, CSV rows, spreadsheet rows, JSON items, or text content. It keeps filenames and real source locations: PDF page, CSV row, Excel sheet and row, or JSON array path. The chunker splits extracted text into groups of 500 words with 80 words repeated between adjacent groups. This keeps passages small enough to search while helping preserve meaning across chunk boundaries.
 
 The embedding model turns every chunk and question into a list of numbers representing its meaning. ChromaDB stores those vectors with the original text and metadata. A question retrieves up to three nearby chunks; results that are too far away are ignored. If no relevant context is found, Ollama is not called.
 
@@ -93,7 +96,7 @@ The retrieved passages and question are sent to the local `llama3.2` model. The 
 
 ## How Citations Work
 
-Sources come from metadata attached when each PDF page is loaded. The terminal prints the original filename and page number for each retrieved source. If page metadata is unavailable, it prints only the filename. No source or page number is guessed.
+Sources come from metadata attached while each file is loaded. The terminal prints the filename and available page, sheet, row, or JSON path for each retrieved source. It only displays locations the loader actually has; it does not guess page or row numbers.
 
 ## Example Question
 
@@ -117,7 +120,7 @@ The tests cover document loading behavior, empty folders, invalid PDFs, chunking
 
 ## Current Limitations
 
-- PDF is the only supported document format.
+- Supported formats are PDF, CSV, Excel (`.xlsx`, `.xlsm`, `.xls`), JSON, TXT, and Markdown.
 - Scanned PDFs need OCR, which is not included.
 - The program accepts one terminal question per run.
 - The embedding model must be downloaded once before first use.

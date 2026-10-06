@@ -46,8 +46,14 @@ def main() -> None:
         print("\nSources:")
         for source in result["sources"]:
             print(f"- {source['file_name']}")
-            if source["page_number"] is not None:
+            if "page_number" in source:
                 print(f"  Page {source['page_number']}")
+            if "sheet_name" in source:
+                print(f"  Sheet: {source['sheet_name']}")
+            if "row_number" in source:
+                print(f"  Row: {source['row_number']}")
+            if "json_path" in source:
+                print(f"  JSON item: {source['json_path']}")
 
 
 if __name__ == "__main__":

@@ -22,8 +22,8 @@ def prepare_pipeline(
     documents = load_documents(documents_folder)
     if not documents:
         raise FileNotFoundError(
-            f"No readable PDF text was found in '{documents_folder}'. "
-            "Add a text-based PDF to data/documents and run again."
+            f"No readable documents were found in '{documents_folder}'. "
+            "Add a supported PDF, CSV, Excel, JSON, TXT, or Markdown file and run again."
         )
 
     chunks = split_documents(documents)
@@ -63,9 +63,14 @@ def answer_question(
     seen = set()
     for match in matches:
         metadata = match["metadata"]
-        source = (metadata.get("file_name"), metadata.get("page_number"))
-        if source not in seen:
-            seen.add(source)
-            sources.append({"file_name": source[0], "page_number": source[1]})
+        # Only include source locations the loader actually knows. For example,
+        # PDFs have page numbers, while spreadsheets have sheet and row names.
+        source = {key: metadata[key] for key in (
+            "file_name", "page_number", "sheet_name", "row_number", "json_path"
+        ) if key in metadata}
+        source_key = tuple(sorted(source.items()))
+        if source_key not in seen:
+            seen.add(source_key)
+            sources.append(source)
 
     return {"answer": answer, "sources": sources}
