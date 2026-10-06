@@ -82,7 +82,7 @@ The program connects to `http://localhost:11434`. This local setup does not requ
 python main.py
 ```
 
-Type one question when prompted. The app reads supported files and rebuilds the local index so removed or changed files do not leave stale search results.
+The app reads supported files and rebuilds the local index once when it starts. Ask multiple questions in the same session; type `exit` when you are done. Keeping the session open avoids loading the embedding model again between questions.
 
 ## How RAG Works
 
@@ -122,10 +122,10 @@ The tests cover document loading behavior, empty folders, invalid PDFs, chunking
 
 - Supported formats are PDF, CSV, Excel (`.xlsx`, `.xlsm`, `.xls`), JSON, TXT, and Markdown.
 - Scanned PDFs need OCR, which is not included.
-- The program accepts one terminal question per run.
+- The app processes questions one at a time in the terminal.
 - The embedding model must be downloaded once before first use.
 - Answer quality depends on the documents, retrieval results, and local model.
-- The local database is rebuilt from all PDFs on each run.
+- The local database is rebuilt from all supported files when the app starts.
 
 ## Future Integration
 
