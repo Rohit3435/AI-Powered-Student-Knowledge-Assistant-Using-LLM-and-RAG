@@ -1,0 +1,26 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local documents and generated vector database
+# Keep the folder, but do not upload private source documents.
+data/documents/*
+!data/documents/.gitkeep
+chroma_db/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
