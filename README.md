@@ -60,7 +60,7 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-The embedding model downloads the first time it is used and is cached locally afterward. An internet connection is needed for that initial model download.
+The embedding model downloads the first time it is used and is cached locally afterward. An internet connection is needed for that initial model download. Later runs use the cached model without contacting Hugging Face. The model is loaded into memory once when the app starts; leave the question session open to avoid loading it again between questions.
 
 ## Ollama Setup
 
