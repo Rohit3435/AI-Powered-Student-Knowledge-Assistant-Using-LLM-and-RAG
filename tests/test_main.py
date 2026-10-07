@@ -31,3 +31,20 @@ def test_main_reuses_loaded_pipeline_for_multiple_questions(monkeypatch, capsys)
     assert answered_questions == ["Question one", "Question two"]
     assert output.count("Answer:") == 2
     assert "Exiting" in output
+
+
+def test_main_accepts_password_through_normal_terminal_input(monkeypatch, capsys):
+    user_inputs = iter(["s", "riya.mehta@nsut.ac.in", "secret", "exit"])
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(user_inputs))
+    monkeypatch.setattr(main, "is_student_email", lambda _email: True)
+    monkeypatch.setattr(main, "authenticate_student", lambda _email, password: password == "secret")
+    monkeypatch.setattr(main, "student_name_for_email", lambda _email: "Riya Mehta")
+    monkeypatch.setattr(main, "prepare_pipeline", lambda **_kwargs: {
+        "collection": object(), "embedding_model": object(), "documents": [],
+    })
+
+    main.main()
+
+    output = capsys.readouterr().out
+    assert "Loaded 0 document file(s)" in output
+    assert "Exiting" in output

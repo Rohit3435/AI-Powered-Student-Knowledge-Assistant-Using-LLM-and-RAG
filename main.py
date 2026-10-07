@@ -1,7 +1,5 @@
 """Simple terminal entry point for the local Mind Meshers RAG pipeline."""
 
-from getpass import getpass
-
 from llm.ollama import OllamaConnectionError, OllamaModelError
 from rag.access import (
     asks_for_another_student,
@@ -27,7 +25,7 @@ def main() -> None:
     if role in {"s", "student"}:
         student_email = input("Student email: ").strip()
         if not is_student_email(student_email) or not authenticate_student(
-            student_email, getpass("Password: ")
+            student_email, input("Password: ")
         ):
             print("Student email or password does not match the local login data.")
             return
