@@ -54,8 +54,9 @@ def retrieve_chunks(
     collection: Any,
     question: str,
     embedding_model: Any,
-    top_k: int = 3,
+    top_k: int = 8,
     max_distance: float = 0.75,
+    candidates_per_document: int = 3,
 ) -> list[dict[str, Any]]:
     """Return nearby chunks, including only results under a distance limit.
 
@@ -73,14 +74,40 @@ def retrieve_chunks(
     question_embedding = create_embeddings(embedding_model, [question])[0]
     results = collection.query(
         query_embeddings=[question_embedding],
-        n_results=top_k,
+        # Fetch extra nearby chunks so one long document does not occupy every
+        # available result before we can select evidence from other files.
+        n_results=max(top_k * 4, top_k),
         include=["documents", "metadatas", "distances"],
     )
 
-    matches: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
     for text, metadata, distance in zip(
         results["documents"][0], results["metadatas"][0], results["distances"][0]
     ):
         if distance <= max_distance:
-            matches.append({"text": text, "metadata": metadata, "distance": distance})
-    return matches
+            candidates.append({"text": text, "metadata": metadata, "distance": distance})
+
+    # Keep evidence from separate files in the context. A question often needs
+    # one fact from a student record and another from a policy, so selecting
+    # only the globally closest chunks can hide one of those documents.
+    candidates.sort(key=lambda match: match["distance"])
+    matches: list[dict[str, Any]] = []
+    per_document: dict[str, int] = {}
+    deferred: list[dict[str, Any]] = []
+    for match in candidates:
+        metadata = match["metadata"]
+        document_key = str(
+            metadata.get("file_name")
+            or metadata.get("document_title")
+            or metadata.get("doc_id")
+            or "unknown document"
+        ).casefold()
+        if per_document.get(document_key, 0) < candidates_per_document:
+            matches.append(match)
+            per_document[document_key] = per_document.get(document_key, 0) + 1
+        else:
+            deferred.append(match)
+
+    # If several documents have no match, prefer those before adding extra
+    # chunks from a file already represented, while respecting the context cap.
+    return (matches + deferred)[:top_k]

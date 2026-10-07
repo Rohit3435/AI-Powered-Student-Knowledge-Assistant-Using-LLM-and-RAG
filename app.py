@@ -1,42 +1,25 @@
 """A Streamlit page with student and general-user access to local documents."""
 
-import csv
 import re
-from pathlib import Path
 
 import streamlit as st
 
 from llm.ollama import OllamaConnectionError, OllamaModelError
 from rag.pipeline import answer_question, prepare_pipeline
+from rag.access import (
+    asks_for_another_student,
+    authenticate_student,
+    is_student_email as is_nsut_student_email,
+    student_name_for_email,
+)
 
 
 st.set_page_config(page_title="Mind Meshers", page_icon=":books:")
 
-STUDENT_CREDENTIALS_FILE = Path("data/documents/id_pass/MindMesh_30_Synthetic_Student_Login_Data.csv")
 PERSONAL_STUDENT_DATA_QUESTION = re.compile(
     r"\b(student\s+(?:id|name|record|profile|details?)|list\s+of\s+students)\b",
     flags=re.IGNORECASE,
 )
-
-
-def is_nsut_student_email(email: str) -> bool:
-    """Accept only a complete email address ending in the NSUT domain."""
-    email = email.strip()
-    return bool(re.fullmatch(r"[^\s@]+@nsut\.ac\.in", email, flags=re.IGNORECASE))
-
-
-def authenticate_student(email: str, password: str) -> bool:
-    """Check a student's email and password against the local credentials CSV."""
-    if not is_nsut_student_email(email) or not STUDENT_CREDENTIALS_FILE.is_file():
-        return False
-
-    with STUDENT_CREDENTIALS_FILE.open("r", encoding="utf-8-sig", newline="") as file:
-        credentials = csv.DictReader(file)
-        return any(
-            (row.get("nsut_email") or "").strip().casefold() == email.strip().casefold()
-            and (row.get("test_password") or "") == password
-            for row in credentials
-        )
 
 
 def show_sign_in() -> None:
@@ -69,20 +52,21 @@ def show_sign_in() -> None:
 
 
 @st.cache_resource(show_spinner="Reading your documents and preparing local search...")
-def get_pipeline(user_role: str):
+def get_pipeline(user_role: str, user_email: str = ""):
     """Prepare a separate local index for each access role."""
     if user_role == "general":
         return prepare_pipeline(
             "data/documents",
             "chroma_db/general",
-            excluded_file_name_keywords=("student", "placement", "eligibility"),
+            excluded_file_name_keywords=("student", "login", "back"),
             allow_empty=True,
             shared_documents_folder="knowledge_base",
         )
     return prepare_pipeline(
         "data/documents",
-        "chroma_db/student",
+        f"chroma_db/student/{user_email.casefold().replace('@', '_at_')}",
         shared_documents_folder="knowledge_base",
+        authorized_student_name=student_name_for_email(user_email),
     )
 
 
@@ -104,7 +88,7 @@ def show_question_page() -> None:
             st.rerun()
 
     try:
-        pipeline = get_pipeline(user_role)
+        pipeline = get_pipeline(user_role, email)
     except FileNotFoundError as error:
         st.error(str(error))
         st.info("Add your files to `data/documents/`, then refresh this page.")
@@ -130,6 +114,9 @@ def show_question_page() -> None:
                 "General users can ask about NSUT rules and notices instead."
             )
             return
+        if user_role == "student" and asks_for_another_student(question, email):
+            st.warning("Access denied. Student records are private; you can ask about your own record and public policies.")
+            return
 
         try:
             result = answer_question(
@@ -137,6 +124,7 @@ def show_question_page() -> None:
                 pipeline["collection"],
                 pipeline["embedding_model"],
                 documents=pipeline["documents"],
+                authorized_student_name=student_name_for_email(email) if user_role == "student" else None,
             )
         except ValueError as error:
             st.warning(str(error))

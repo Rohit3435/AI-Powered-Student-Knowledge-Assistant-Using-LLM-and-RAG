@@ -79,6 +79,21 @@ def test_distant_results_are_filtered():
     assert retrieve_chunks(collection, "question", FakeEmbeddingModel()) == []
 
 
+def test_retrieval_keeps_relevant_chunks_from_multiple_documents():
+    collection = FakeCollection()
+    collection.add(
+        ["a1", "a2", "a3", "a4", "b1"],
+        ["student fact 1", "student fact 2", "student fact 3", "student fact 4", "policy fact"],
+        [[1.0]] * 5,
+        [{"file_name": "student.csv"}] * 4 + [{"file_name": "policy.pdf"}],
+    )
+
+    matches = retrieve_chunks(collection, "eligibility", FakeEmbeddingModel())
+
+    assert any(match["metadata"]["file_name"] == "student.csv" for match in matches)
+    assert any(match["metadata"]["file_name"] == "policy.pdf" for match in matches)
+
+
 def test_real_chromadb_persists_and_searches_chunks(tmp_path):
     # This checks the real local ChromaDB API while using a tiny deterministic
     # embedding double, so it does not download or load a machine learning model.

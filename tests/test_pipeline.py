@@ -42,7 +42,10 @@ def test_basic_pipeline_passes_context_and_returns_citations():
 
     result = answer_question("What is the requirement?", collection, FakeEmbeddingModel(), fake_answer)
 
-    assert calls == [("What is the requirement?", "Students need 75 percent attendance.")]
+    assert calls == [(
+        "What is the requirement?",
+        "[Source: attendance.pdf, page 3]\nStudents need 75 percent attendance.",
+    )]
     assert result == {
         "answer": "The document says 75 percent.",
         "sources": [{"file_name": "attendance.pdf", "page_number": 3}],
@@ -87,6 +90,20 @@ def test_answer_sources_keep_non_pdf_locations():
     ]
 
 
+def test_combined_context_labels_each_source_for_the_language_model():
+    captured = []
+    collection = FakeCollection([
+        {"text": "Riya CGPA is 8.4.", "metadata": {"file_name": "students.csv", "row_number": 3}},
+        {"text": "TechNova requires a 7.0 CGPA.", "metadata": {"file_name": "policy.pdf", "page_number": 1}},
+    ])
+    answer_question(
+        "Does Riya qualify?", collection, FakeEmbeddingModel(),
+        lambda _question, context: captured.append(context) or "Answer",
+    )
+    assert "[Source: students.csv, row 3]" in captured[0]
+    assert "[Source: policy.pdf, page 1]" in captured[0]
+
+
 def test_eligibility_uses_uploaded_student_row_and_policy_rules():
     documents = [
         {
@@ -113,14 +130,92 @@ def test_eligibility_uses_uploaded_student_row_and_policy_rules():
         documents=documents,
     )
 
-    assert result["answer"] == (
-        "No. Aarav Sharma is not eligible for FinSecure Technologies: "
-        "CGPA 7.8 is below the required 8."
-    )
+    assert "Aarav Sharma is not eligible for FinSecure Technologies" in result["answer"]
+    assert "CGPA: FAIL" in result["answer"]
     assert result["sources"] == [
         {"file_name": "students.csv", "row_number": 2},
         {"file_name": "eligibility.pdf", "page_number": 1},
     ]
+
+
+def test_eligibility_combines_current_student_csv_with_company_policy():
+    from rag.loader import load_documents
+
+    documents = load_documents("data/documents")
+    result = answer_question(
+        "Is Riya Mehta eligible for TechNova?",
+        FakeCollection([]),
+        FakeEmbeddingModel(),
+        lambda *_args: pytest.fail("Deterministic eligibility must not depend on Ollama"),
+        documents=documents,
+    )
+
+    assert "Riya Mehta is eligible for TechNova Solutions" in result["answer"]
+    assert any(source.get("row_number") == 3 for source in result["sources"])
+    assert any(source.get("page_number") == 1 for source in result["sources"])
+
+
+def test_eligibility_reports_missing_required_student_fields():
+    documents = [
+        {
+            "text": "Company\nMinimum CGPA\nMinimum Attendance\nMaximum Backlogs\nEligible Branches\nTechNova Solutions\n7.0\n60%\n1\nCSE, ECE, IT",
+            "metadata": {"file_name": "policy.pdf", "page_number": 1},
+        },
+        {
+            "text": "name: Riya Mehta. cgpa: 8.4",
+            "metadata": {"file_name": "students.csv", "row_number": 3},
+        },
+    ]
+    result = answer_question(
+        "Is Riya Mehta eligible for TechNova?", FakeCollection([]), FakeEmbeddingModel(),
+        lambda *_args: pytest.fail("Missing criteria must not be guessed"), documents=documents,
+    )
+    assert "could not be completely verified" in result["answer"]
+    assert "attendance" in result["answer"]
+
+
+def test_prepare_pipeline_keeps_only_authorized_student_and_public_policy(tmp_path, monkeypatch):
+    all_documents = [
+        {"text": "name: Riya Mehta. cgpa: 8.4", "metadata": {"file_name": "students.csv", "row_number": 3}},
+        {"text": "name: Aarav Sharma. cgpa: 7.8", "metadata": {"file_name": "students.csv", "row_number": 2}},
+        {"text": "secret: password", "metadata": {"file_name": "login_data.xlsx", "row_number": 2}},
+        {"text": "TechNova requires 7.0 CGPA", "metadata": {"file_name": "placement_policy.pdf", "page_number": 1}},
+    ]
+    monkeypatch.setattr("rag.pipeline.load_documents", lambda _folder: all_documents)
+    monkeypatch.setattr("rag.pipeline.load_embedding_model", lambda: "model")
+    monkeypatch.setattr("rag.pipeline.create_collection", lambda _path: ("client", "collection"))
+    monkeypatch.setattr("rag.pipeline.store_chunks", lambda *_args: None)
+
+    result = prepare_pipeline(tmp_path, tmp_path / "chroma", authorized_student_name="Riya Mehta")
+
+    filenames = [doc["metadata"]["file_name"] for doc in result["documents"]]
+    assert filenames == ["students.csv", "placement_policy.pdf"]
+    assert "Riya Mehta" in result["documents"][0]["text"]
+
+
+def test_policy_question_returns_policy_source_without_student_record():
+    documents = [{
+        "text": "Company\nMinimum CGPA\nMinimum Attendance\nMaximum Backlogs\nEligible Branches\nTechNova Solutions\n7.0\n60%\n1\nCSE, ECE, IT",
+        "metadata": {"file_name": "policy.pdf", "page_number": 1},
+    }]
+    result = answer_question(
+        "What CGPA does TechNova require?", FakeCollection([]), FakeEmbeddingModel(),
+        lambda *_args: pytest.fail("Policy values should be read from the policy"), documents=documents,
+    )
+    assert "7" in result["answer"]
+    assert result["sources"] == [{"file_name": "policy.pdf", "page_number": 1}]
+
+
+def test_student_comparison_question_uses_deterministic_eligibility_check():
+    from rag.loader import load_documents
+
+    result = answer_question(
+        "Does Riya's CGPA meet TechNova's requirement?",
+        FakeCollection([]), FakeEmbeddingModel(),
+        lambda *_args: pytest.fail("A comparison should use the deterministic check"),
+        documents=load_documents("data/documents"),
+    )
+    assert "Riya Mehta is eligible for TechNova Solutions" in result["answer"]
 
 
 def test_prepare_pipeline_reports_empty_document_folder(tmp_path):

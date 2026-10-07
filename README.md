@@ -91,7 +91,7 @@ The page offers two options:
 
 Each role uses its own local ChromaDB index. **Sign out / change user** returns to the two options. Keep the credential CSV private; it is ignored by Git along with the other files under `data/documents/`.
 
-The terminal interface is still available with `python main.py`.
+The terminal interface is still available with `python main.py`. Choose student access and sign in to include only that student's private records alongside public policies. General-user mode indexes public documents only. Student login data is never added to the search index.
 
 ## Shared NSUT Knowledge Base
 
@@ -101,9 +101,9 @@ The file `knowledge_base/NSUT_Student_Knowledge_Base_Chunks.jsonl` comes from th
 
 RAG means retrieval augmented generation. The loader extracts PDF pages separately, CSV rows, spreadsheet rows, JSON items/JSONL records, or text content. It keeps filenames and real source locations: PDF page, CSV row, Excel sheet and row, JSON array path, or the shared knowledge base document title, page, and section. The chunker splits extracted text into groups of 500 words with 80 words repeated between adjacent groups. This keeps passages small enough to search while helping preserve meaning across chunk boundaries.
 
-The embedding model turns every chunk and question into a list of numbers representing its meaning. ChromaDB stores those vectors with the original text and metadata. A question retrieves up to three nearby chunks; results that are too far away are ignored. If no relevant context is found, Ollama is not called.
+The embedding model turns every chunk and question into a list of numbers representing its meaning. ChromaDB stores those vectors with the original text and metadata. A question searches a wider set of nearby chunks, then includes up to eight relevant passages while limiting how many come from a single document. This gives the model a chance to combine facts across files. Results that are too far away are ignored. If no relevant context is found, Ollama is not called.
 
-For placement eligibility questions, the app reads the student values from the uploaded table and the company thresholds from the uploaded policy. It compares CGPA, attendance, backlogs, and branch directly before generating an answer, so those numeric checks do not depend on the language model guessing.
+For placement eligibility questions, the app reads the authorized student's values from the student record and combines them with the matching company policy. It compares CGPA, attendance, backlogs, and branch directly in Python. If a required value is missing, it reports that eligibility cannot be fully verified. Policy-only questions return policy values without accessing a student record.
 
 ## How Ollama Works
 
