@@ -1,8 +1,8 @@
-# Mind Meshers: Local RAG with Ollama
+# AI-Powered Student Knowledge Assistant
 
 ## Project Overview
 
-This project answers student questions from documentation in local PDF, CSV, Excel, JSON, TXT, and Markdown files. It searches for relevant passages with embeddings and ChromaDB, then asks a local Ollama model to write a grounded answer. No university policy documents are included; add approved, real documents to `data/documents/`.
+A privacy focused student knowledge assistant that answers questions from local PDF, CSV, Excel, JSON, TXT, and Markdown documents using retrieval augmented generation (RAG) and a locally run large language model. It searches for relevant passages with embeddings and ChromaDB, then asks a local Ollama model to write a grounded answer. No university policy documents are included; add approved, real documents to `data/documents/`.
 
 ## Current Architecture
 
